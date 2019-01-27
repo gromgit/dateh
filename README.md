@@ -38,6 +38,7 @@ Copy `dateh` to a directory in your `PATH`.
 `dateh` takes the same options and format specifiers as GNU `date`, in addition to:
 * `-h|--help` to print `dateh`-specific help
 * `-H|--longhelp` to print both `dateh` and `date` help
+* `-V|--version` to print `dateh` version
 
 If the `DATEH_DEFAULT_FORMAT` environment variable is set, `dateh` uses its value as the fallback date representation for the `@{d+}` specifier (default: `%Y-%m-%d`).
 
