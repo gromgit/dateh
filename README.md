@@ -5,12 +5,12 @@ The first set deals with relative date outputs (English only):
 
 | Spec | Description |
 | ---- | ----------- |
-| `@{d}` | relative date, abbrev date names (e.g. yesterday, next Fri, 17 days ago) |
-| `@{D}` | like @{d}, only with full date names (e.g. next Friday, 17 days' time) |
-| `@{d+}` | like @{d}, but falls back to user-configurable date representation if outside 1 week's range (default: %Y-%m-%d) |
-| `@{w}` | relative week (e.g. last week, 3 weeks' time) |
-| `@{m}` | relative month (e.g. last month, 3 months' time) |
-| `@{y}` | relative year (e.g. last year, 3 years' time) |
+| `@{d}` | relative date, abbrev date names (e.g. `yesterday`, `next Fri`, `17 days ago`) |
+| `@{D}` | like `@{d}`, only with full date names (e.g. `next Friday`, `17 days' time`) |
+| `@{d+}` | like `@{d}`, but falls back to user-configurable date representation if outside 1 week's range (default: `%Y-%m-%d`) |
+| `@{w}` | relative week (e.g. `last week`, `3 weeks' time`) |
+| `@{m}` | relative month (e.g. `last month`, `3 months' time`) |
+| `@{y}` | relative year (e.g. `last year`, `3 years' time`) |
 | `@{h}` | auto-select relative representation (abbreviated day name) |
 | `@{H}` | auto-select relative representation (full day name) |
 
@@ -22,8 +22,8 @@ The second set deals with ordinal day-of-month representations:
 
 | Spec | Description |
 | ---- | ----------- |
-| `@{o}` | ordinal day-of-month, short-form (e.g. 29th) |
-| `@{O}` | ordinal day-of-month, long-form (e.g. twenty-ninth) |
+| `@{o}` | ordinal day-of-month, short-form (e.g. `29th`) |
+| `@{O}` | ordinal day-of-month, long-form (e.g. `twenty-ninth`) |
 
 ## Dependencies
 
