@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-VERSION=1.0
+VERSION=1.1
 short_ordinals=(invalid 1st 2nd 3rd 4th 5th 6th 7th 8th 9th 10th 11th
 12th 13th 14th 15th 16th 17th 18th 19th 20th 21st 22nd 23rd 24th 25th
 26th 27th 28th 29th 30th 31st)
@@ -11,16 +11,45 @@ twenty-seventh twenty-eighth twenty-ninth thirtieth thirty-first)
 
 # human_date [<date command options>]
 human_date() {
-  local date_args=("${@:1:$(($# - 1))}") format_spec="${@: -1}" h_date h_week h_month h_year
-  local date_secs=$(date -u "${date_args[@]}" +%s) now_secs=$(date -u +%s)
-  [[ $(date "${date_args[@]}" +%Y-%m-%d-%a-%A) =~ (.*)-(.*)-(.*)-(.*)-(.*) ]] &&
-    local date_year="${BASH_REMATCH[1]}" date_month="${BASH_REMATCH[2]}" date_dom="${BASH_REMATCH[3]}" \
-          date_dow="${BASH_REMATCH[4]}" date_DOW="${BASH_REMATCH[5]}"
-  [[ $(date +%Y-%m) =~ (.*)-(.*) ]] && local now_year="${BASH_REMATCH[1]}" now_month="${BASH_REMATCH[2]}"
+  local date_args=("${@:1:$(($# - 1))}") date_format="${*: -1}"
+  local h_date h_DATE h_week h_month h_year
+
+  # "Freeze" user & current times with GNU date, while adding
+  # some intermediate results in user time for later use
+  local date_obj now_obj
+  date_obj="$(date "${date_args[@]}" "${date_format}[%Y-%-m-%-d-%a-%A-%s-%::z|${DATEH_DEFAULT_FORMAT:-%Y-%m-%d}]")"
+  now_obj="$(date +%Y-%-m-%s-%::z)"
+
+  # Now parse the resulting objects
+  if [[ "$date_obj" =~ (.*)\[([0-9]+)-([0-9]+)-([0-9]+)-(.*)-(.*)-([0-9]+)-([+-][0-9]+:[0-9]+:[0-9]+)\|(.*)\] ]]; then
+    local date_out="${BASH_REMATCH[1]}" date_year="${BASH_REMATCH[2]}"
+    local date_month="${BASH_REMATCH[3]}" date_dom="${BASH_REMATCH[4]}"
+    local date_dow="${BASH_REMATCH[5]}" date_DOW="${BASH_REMATCH[6]}"
+    local date_utc_secs="${BASH_REMATCH[7]}" date_tz="${BASH_REMATCH[8]}"
+    local h_dateplus="${BASH_REMATCH[9]}"
+  else
+    echo "FATAL ERROR: Date object '$date_obj' can't be parsed." >&2
+    return 1
+  fi
+  if [[ "$now_obj" =~ ([0-9]+)-([0-9]+)-([0-9]+)-([+-][0-9]+:[0-9]+:[0-9]+) ]]; then
+    local now_year="${BASH_REMATCH[1]}" now_month="${BASH_REMATCH[2]}"
+    local now_utc_secs="${BASH_REMATCH[3]}" now_tz="${BASH_REMATCH[4]}"
+  else
+    echo "FATAL ERROR: Now object '$now_obj' can't be parsed." >&2
+    return 1
+  fi
+
+  # Now derive epoch equivalent of local timestamps, otherwise
+  # relative days math will only be correct in UTC+0 timezone
+  local date_tzsecs date_secs now_tzsecs now_secs
+  date_tzsecs="$(tzsecs "$date_tz")"
+  date_secs=$((date_utc_secs + date_tzsecs))
+  now_tzsecs="$(tzsecs "$now_tz")"
+  now_secs=$((now_utc_secs + now_tzsecs))
 
   ### ORDINAL DAYS OF MONTH
-  format_spec="${format_spec//@\{o\}/${short_ordinals[${date_dom##0}]}}"
-  format_spec="${format_spec//@\{O\}/${long_ordinals[${date_dom##0}]}}"
+  date_out="${date_out//@\{o\}/${short_ordinals[${date_dom}]}}"
+  date_out="${date_out//@\{O\}/${long_ordinals[${date_dom}]}}"
 
   ### RELATIVE DAYS
   local date_days=$((date_secs / 86400)) now_days=$((now_secs / 86400))
@@ -44,27 +73,25 @@ human_date() {
       h_DATE="next $date_DOW"
     ;;
     *)
-      # Outside one week's range, we enable two different representations
       h_date="$(relative_interval day $((date_days - now_days)))"
-      h_dateplus="$(date "${date_args[@]}" +"${DATEH_DEFAULT_FORMAT:-%Y-%m-%d}")"
     ;;
   esac
-  format_spec="${format_spec//@\{d\}/${h_date}}"
-  format_spec="${format_spec//@\{d+\}/${h_dateplus:-${h_date}}}"
-  format_spec="${format_spec//@\{D\}/${h_DATE:-${h_date}}}"
+  date_out="${date_out//@\{d\}/${h_date}}"
+  date_out="${date_out//@\{d+\}/${h_dateplus:-${h_date}}}"
+  date_out="${date_out//@\{D\}/${h_DATE:-${h_date}}}"
 
   ### RELATIVE WEEKS
   # Weeks are counted from Unix epoch (midnight 1970-01-01),
   # with midnight 1970-01-05 (Mon) being the start of week 1
   local date_weeks=$(((date_days + 3) / 7)) now_weeks=$(((now_days + 3) / 7))
   h_week="$(relative_interval week $((date_weeks - now_weeks)))"
-  format_spec="${format_spec//@\{w\}/${h_week}}"
+  date_out="${date_out//@\{w\}/${h_week}}"
 
   ### RELATIVE MONTHS & YEARS
   h_month="$(relative_interval month $(((date_year * 12 + date_month) - (now_year * 12 + now_month))))"
   h_year="$(relative_interval year $((date_year - now_year)))"
-  format_spec="${format_spec//@\{m\}/${h_month}}"
-  format_spec="${format_spec//@\{y\}/${h_year}}"
+  date_out="${date_out//@\{m\}/${h_month}}"
+  date_out="${date_out//@\{y\}/${h_year}}"
 
   ### AUTO-SELECT
   if [[ "$h_year" == [1-9]* ]]; then
@@ -77,11 +104,11 @@ human_date() {
     h_auto="$h_date"
     h_AUTO="$h_DATE"
   fi
-  format_spec="${format_spec//@\{h\}/${h_auto}}"
-  format_spec="${format_spec//@\{H\}/${h_AUTO:-${h_auto}}}"
+  date_out="${date_out//@\{h\}/${h_auto}}"
+  date_out="${date_out//@\{H\}/${h_AUTO:-${h_auto}}}"
  
-  # OK, now run the format_spec through GNU date for final result
-  date "${date_args[@]}" "${format_spec}"
+  # And we're done
+  echo "${date_out}"
 }
 
 # relative_interval <week|month|year> <interval_offset>
@@ -92,6 +119,16 @@ relative_interval() {
      1) echo "next ${1}";;
      *) [[ $2 -lt 0 ]] && echo "${2#-} ${1}s ago" || echo "${2} ${1}s' time";;
   esac
+}
+
+# tzsecs <[+-]HH:MM:SS>
+tzsecs() {
+  if [[ "$1" =~ ([+-])([0-9]{2}):([0-9]{2}):([0-9]{2}) ]]; then
+    echo "${BASH_REMATCH[1]#+}$(( ${BASH_REMATCH[2]#0} * 3600 + ${BASH_REMATCH[3]#0} * 60 + ${BASH_REMATCH[4]#0} ))"
+  else
+    echo "ERROR: Unable to parse TZ spec '$1'." >&2
+    echo 0
+  fi
 }
 
 usage() {
@@ -148,7 +185,7 @@ while true; do
   shift
 done
 
-if [[ $# -eq 0 || "${@: -1}" != +*\@\{*\}* ]]; then
+if [[ $# -eq 0 || "${*: -1}" != +*\@\{*\}* ]]; then
   # No human format specifier, just call "date" as normal
   date "$@"
 else
